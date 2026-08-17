@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>ぽちっとぬりえ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ぽちっとぬりえ">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{
+  --maru: "Hiragino Maru Gothic ProN", "ヒラギノ丸ゴ ProN W4", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --ui-bg: #FFF7E8;
+  --ui-line: #3A2E22;
+  --pad: 12px;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+html,body{
+  width:100%; height:100%; overflow:hidden;
+  font-family:var(--maru);
+  background:#1a1a1a;
+  color:var(--ui-line);
+  -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+  touch-action:none;
+}
+button{ font-family:inherit; border:none; background:none; cursor:pointer; color:inherit; }
+
+/* ---------- 画面切り替え ---------- */
+.screen{
+  position:fixed; inset:0;
+  display:none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.screen.on{ display:flex; }
+
+/* =================================================================
+   1. タイトル画面
+   ================================================================= */
+#titleScreen{
+  flex-direction:column; align-items:center; justify-content:space-between;
+  background:#87CEEB center/cover no-repeat;
+  background-image:url("haikei.svg");   /* JS が machiuke.jpg / 保存した画像に差し替える */
+}
+
+/* 背景を変えるための、こっそりボタン（長おしで開く） */
+#bgBtn{
+  position:absolute; top:8px; right:10px; z-index:5;
+  width:52px; height:52px; border-radius:50%;
+  font-size:24px; line-height:52px;
+  background:rgba(255,255,255,.22); color:#fff;
+  opacity:.45;
+}
+#bgPanel{
+  position:absolute; inset:0; z-index:6;
+  display:none; align-items:center; justify-content:center; gap:18px; flex-direction:column;
+  background:rgba(0,0,0,.62);
+}
+#bgPanel.on{ display:flex; }
+#bgPanel .ttl{ color:#FFF3D6; font-size:26px; font-weight:800; }
+#bgPanel button{
+  min-width:280px;
+  padding:16px 28px; border-radius:18px; border:5px solid #23201C;
+  background:#FFE066; font-size:24px; font-weight:800;
+}
+#bgPanel button.sub{ background:#E8E8E8; }
+#bgPanel button.close{ background:#B7E7FF; }
+#titleScreen::before{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(0,0,0,.30) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,0) 60%, rgba(0,0,0,.35) 100%);
+  pointer-events:none;
+}
+.title-wrap{ position:relative; margin-top:3.2vh; text-align:center; }
+.app-title{
+  font-size: clamp(44px, 9.5vh, 104px);
+  font-weight:800;
+  letter-spacing:.06em;
+  color:#FFFFFF;
+  -webkit-text-stroke: clamp(9px, 1.7vh, 18px) #23201C;
+  paint-order: stroke fill;
+  text-shadow: 0 10px 0 rgba(0,0,0,.30);
+}
+.app-title .c{ display:inline-block; animation: bob 2.4s ease-in-out infinite; }
+.app-title .c:nth-child(2n){ animation-delay:.15s }
+.app-title .c:nth-child(3n){ animation-delay:.3s }
+@keyframes bob{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-8px) } }
+
+.touch-btn{
+  position:relative;
+  margin-bottom:5vh;
+  display:flex; align-items:center; gap:.35em;
+  padding: clamp(16px,2.6vh,30px) clamp(48px,7vw,96px);
+  border-radius:999px;
+  background:linear-gradient(180deg,#FFE066,#FFB020);
+  border:8px solid #2B2B2B;
+  box-shadow: 0 10px 0 #B87400, 0 18px 26px rgba(0,0,0,.4);
+  font-size: clamp(34px, 6.2vh, 68px);
+  font-weight:800; letter-spacing:.12em;
+  color:#3A2E22;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+.touch-btn:active{ transform:translateY(8px); box-shadow:0 2px 0 #B87400, 0 6px 12px rgba(0,0,0,.4); }
+@keyframes pulse{ 0%,100%{ transform:scale(1) } 50%{ transform:scale(1.055) } }
+.touch-btn .finger{ font-size:.9em; }
+
+/* =================================================================
+   2. えらぶ画面
+   ================================================================= */
+#selectScreen{
+  flex-direction:column;
+  background:
+    radial-gradient(circle at 18% 12%, #FFF9EC 0%, #FFE9C2 45%, #FFD79A 100%);
+}
+.select-head{
+  flex:0 0 auto;
+  text-align:center;
+  padding: clamp(8px,1.6vh,20px) 0 clamp(4px,.8vh,10px);
+  font-size: clamp(26px,4.4vh,46px);
+  font-weight:800; letter-spacing:.08em;
+  color:#FFFFFF;
+  -webkit-text-stroke: 7px #3A2E22; paint-order: stroke fill;
+}
+.grid{
+  flex:1 1 auto;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  grid-template-rows:repeat(3,1fr);
+  gap: clamp(8px,1.5vh,18px);
+  padding: 0 clamp(10px,2vw,26px) clamp(10px,2vh,22px);
+  min-height:0;
+}
+/* あまった2枚は下の段の まんなかに置く */
+.card:nth-child(9){ grid-column:2; }
+.card{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:#FFFFFF;
+  border:6px solid #3A2E22;
+  border-radius:22px;
+  box-shadow:0 7px 0 rgba(58,46,34,.35);
+  overflow:hidden;
+  min-height:0; min-width:0;
+  transition:transform .08s;
+}
+.card:active{ transform:translateY(6px) scale(.97); box-shadow:0 1px 0 rgba(58,46,34,.35); }
+.card svg{ flex:1 1 auto; width:100%; height:100%; min-height:0; display:block; }
+.card .label{
+  flex:0 0 auto; width:100%;
+  background:#FFE9B8; border-top:5px solid #3A2E22;
+  font-size: clamp(15px,2.6vh,28px); font-weight:800; letter-spacing:.05em;
+  padding: .18em 0 .26em;
+  white-space:nowrap;
+}
+
+/* =================================================================
+   3. ぬりえ画面
+   ================================================================= */
+#paintScreen{ flex-direction:row; background:#FFE9C2; gap:var(--pad); padding:var(--pad); }
+
+.left-col{ flex:1 1 auto; display:flex; flex-direction:column; gap:var(--pad); min-width:0; }
+
+.paper-area{
+  flex:1 1 auto;
+  display:flex; align-items:center; justify-content:center;
+  min-height:0; min-width:0;
+}
+/* 大きさは JS の fitPaper() が 4:3 になるよう毎回計算して入れる */
+.paper{
+  position:relative;
+  background:#FFFFFF;
+  border:6px solid #3A2E22;
+  border-radius:18px;
+  box-shadow:0 8px 0 rgba(58,46,34,.28), 0 14px 30px rgba(0,0,0,.15);
+  overflow:hidden;
+  touch-action:none;
+  isolation:isolate;   /* 乗算合成をこの中だけに閉じ込める */
+}
+#paintCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; z-index:1; }
+/* 線画は「白ぬき＋黒線」。乗算で重ねると白い部分は下の色がそのまま見え、
+   黒い線だけが上に残る（重なった図形の隠れ線も正しく隠れる）             */
+#lineLayer{
+  position:absolute; inset:0; width:100%; height:100%;
+  pointer-events:none; z-index:2;
+  mix-blend-mode:multiply;
+}
+
+/* パレット */
+.palette{
+  flex:0 0 auto;
+  display:grid; grid-template-columns:repeat(10,1fr);
+  gap: clamp(4px,.9vw,12px);
+}
+.swatch{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:4px 0 5px;
+  border-radius:16px;
+  transition:transform .08s, background .12s;
+}
+.swatch .dot{
+  width: clamp(34px, 7.4vh, 62px); height: clamp(34px, 7.4vh, 62px);
+  border-radius:50%;
+  border:5px solid #3A2E22;
+  box-shadow: inset 0 -7px 0 rgba(0,0,0,.16), 0 4px 0 rgba(58,46,34,.3);
+}
+.swatch .nm{ font-size: clamp(11px,2.1vh,22px); font-weight:800; letter-spacing:.02em; white-space:nowrap; }
+.swatch.sel{ background:#3A2E22; }
+.swatch.sel .nm{ color:#FFF3D6; }
+.swatch.sel .dot{ border-color:#FFF3D6; transform:scale(1.06); }
+.swatch:active{ transform:translateY(4px); }
+
+/* 右サイド */
+.side{
+  flex:0 0 auto;
+  width: clamp(140px, 21vw, 230px);
+  display:flex; flex-direction:column; gap:var(--pad);
+}
+.btn{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  border:6px solid #3A2E22; border-radius:20px;
+  font-weight:800; letter-spacing:.06em;
+  box-shadow:0 7px 0 rgba(58,46,34,.4);
+  padding: clamp(6px,1.2vh,14px) 6px clamp(8px,1.4vh,16px);
+  transition:transform .08s;
+}
+.btn:active{ transform:translateY(6px); box-shadow:0 1px 0 rgba(58,46,34,.4); }
+.btn .ic{ font-size: clamp(22px,4.4vh,42px); line-height:1; }
+.btn .tx{ font-size: clamp(15px,2.8vh,30px); }
+
+#backBtn{ background:linear-gradient(180deg,#B7E7FF,#6FC6F5); }
+#eraserBtn{ background:linear-gradient(180deg,#FFFFFF,#E8E8E8); flex:0 0 auto; }
+#eraserBtn.sel{ background:linear-gradient(180deg,#FFD86B,#FFA91E); border-color:#3A2E22; transform:translateY(4px); box-shadow:0 2px 0 rgba(58,46,34,.4); }
+
+.ref{
+  flex:0 0 auto;
+  background:#FFFFFF; border:6px solid #3A2E22; border-radius:20px;
+  padding:6px; display:flex; flex-direction:column; align-items:center;
+  box-shadow:0 7px 0 rgba(58,46,34,.28);
+}
+.ref .cap{ font-size: clamp(12px,2.2vh,22px); font-weight:800; margin-bottom:2px; }
+.ref svg{ width:100%; height:auto; display:block; }
+.side .spacer{ flex:1 1 auto; min-height:0; }
+
+/* =================================================================
+   たてむき警告
+   ================================================================= */
+#rotate{
+  position:fixed; inset:0; z-index:99;
+  display:none; flex-direction:column; align-items:center; justify-content:center; gap:24px;
+  background:#2B2B2B; color:#FFF3D6; text-align:center;
+  font-size:30px; font-weight:800; line-height:1.6;
+}
+#rotate .ic{ font-size:90px; animation:spin 2.4s ease-in-out infinite; }
+@keyframes spin{ 0%,45%{ transform:rotate(0) } 55%,100%{ transform:rotate(-90deg) } }
+@media (orientation:portrait){ #rotate{ display:flex; } }
+</style>
+</head>
+<body>
+
+<!-- ============ 1. タイトル ============ -->
+<section id="titleScreen" class="screen on">
+  <div class="title-wrap">
+    <h1 class="app-title" id="appTitle"></h1>
+  </div>
+  <button class="touch-btn" id="touchBtn"><span class="finger">👆</span>タッチ</button>
+
+  <button id="bgBtn" aria-label="はいけいのせってい">⚙</button>
+  <div id="bgPanel">
+    <div class="ttl">はいけいの がぞう</div>
+    <button id="bgPick">がぞうを えらぶ</button>
+    <button id="bgReset" class="sub">もとに もどす</button>
+    <button id="bgClose" class="close">とじる</button>
+  </div>
+  <input type="file" id="bgFile" accept="image/*" hidden>
+</section>
+
+<!-- ============ 2. えらぶ ============ -->
+<section id="selectScreen" class="screen">
+  <div class="select-head">どれを ぬる？</div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<!-- ============ 3. ぬりえ ============ -->
+<section id="paintScreen" class="screen">
+  <div class="left-col">
+    <div class="paper-area">
+      <div class="paper" id="paper">
+        <canvas id="paintCanvas" width="1600" height="1200"></canvas>
+        <img id="lineLayer" alt="">
+      </div>
+    </div>
+    <div class="palette" id="palette"></div>
+  </div>
+  <div class="side">
+    <button class="btn" id="backBtn"><span class="ic">👈</span><span class="tx">もどる</span></button>
+    <div class="ref">
+      <div class="cap">みほん</div>
+      <div id="refImg"></div>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="eraserBtn"><span class="ic">🧽</span><span class="tx">けしごむ</span></button>
+  </div>
+</section>
+
+<div id="rotate"><div class="ic">📱</div><div>iPadを<br>よこむきに してね</div></div>
+
+<script src="art.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- タイトルを1文字ずつアニメーション用に分解 ---------- */
+  const TITLE = 'ぽちっとぬりえ';
+  document.getElementById('appTitle').innerHTML =
+    [...TITLE].map(c => `<span class="c">${c}</span>`).join('');
+
+  /* =========================================================
+     タイトル画面の背景
+       1. この iPad に保存された画像があれば それ
+       2. なければ 同じフォルダの machiuke.jpg
+       3. どちらも無ければ haikei.svg（CSSの初期値）
+     ========================================================= */
+  const BG_KEY = 'pochi.bg';
+  const titleScreen = document.getElementById('titleScreen');
+
+  function applyBg(url){ titleScreen.style.backgroundImage = 'url("' + url + '")'; }
+
+  (function initBg(){
+    const saved = localStorage.getItem(BG_KEY);
+    if (saved){ applyBg(saved); return; }
+    const probe = new Image();               // 置いてあれば使う。無ければ何もしない
+    probe.onload = () => applyBg('machiuke.jpg');
+    probe.src = 'machiuke.jpg';
+  })();
+
+  /* --- 背景を選ぶ（長おしで開く。小さい子が誤って触らないように） --- */
+  const bgBtn   = document.getElementById('bgBtn');
+  const bgPanel = document.getElementById('bgPanel');
+  const bgFile  = document.getElementById('bgFile');
+  let bgTimer = null;
+
+  bgBtn.addEventListener('pointerdown', () => {
+    bgTimer = setTimeout(() => bgPanel.classList.add('on'), 700);
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(t =>
+    bgBtn.addEventListener(t, () => clearTimeout(bgTimer)));
+
+  document.getElementById('bgClose').addEventListener('click', () => bgPanel.classList.remove('on'));
+  document.getElementById('bgPick').addEventListener('click', () => bgFile.click());
+  document.getElementById('bgReset').addEventListener('click', () => {
+    localStorage.removeItem(BG_KEY);
+    titleScreen.style.backgroundImage = '';
+    bgPanel.classList.remove('on');
+  });
+
+  bgFile.addEventListener('change', () => {
+    const file = bgFile.files && bgFile.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        // そのままだと保存領域に入らないので 横1600px まで縮めてから保存する
+        const scale = Math.min(1, 1600 / im.width);
+        const c = document.createElement('canvas');
+        c.width  = Math.round(im.width  * scale);
+        c.height = Math.round(im.height * scale);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        const url = c.toDataURL('image/jpeg', 0.82);
+        try {
+          localStorage.setItem(BG_KEY, url);
+        } catch (_) {
+          alert('がぞうが おおきすぎて ほぞんできませんでした');
+          return;
+        }
+        applyBg(url);
+        bgPanel.classList.remove('on');
+      };
+      im.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    bgFile.value = '';
+  });
+
+  /* ---------- オフラインで動くようにする ---------- */
+  if ('serviceWorker' in navigator &&
+      (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+  }
+
+  /* ---------- 画面切り替え ---------- */
+  const screens = {
+    title:  document.getElementById('titleScreen'),
+    select: document.getElementById('selectScreen'),
+    paint:  document.getElementById('paintScreen')
+  };
+  function show(name){
+    for (const k in screens) screens[k].classList.toggle('on', k === name);
+  }
+
+  /* ---------- 2. えらぶ画面を組み立てる ---------- */
+  const grid = document.getElementById('grid');
+  ART.forEach((art, i) => {
+    const card = document.createElement('button');
+    card.className = 'card';
+    card.innerHTML = colorSvg(art.svg) + `<div class="label">${art.name}</div>`;
+    card.addEventListener('click', () => openPaint(i));
+    grid.appendChild(card);
+  });
+
+  /* ---------- 3. ぬりえ画面 ---------- */
+  const canvas   = document.getElementById('paintCanvas');
+  const ctx      = canvas.getContext('2d');
+  const lineLayer= document.getElementById('lineLayer');
+  const refImg   = document.getElementById('refImg');
+  const paper    = document.getElementById('paper');
+
+  const W = canvas.width, H = canvas.height;
+  const R = 12;                      // クレヨンの太さ（細め）
+  const ERASER_R = R * 3;
+
+  let currentColor = PALETTE[0].color;
+  let tool = 'crayon';               // 'crayon' | 'eraser'
+
+  /* --- パレットを組み立てる --- */
+  const paletteEl = document.getElementById('palette');
+  const swatches = [];
+  PALETTE.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.className = 'swatch' + (i === 0 ? ' sel' : '');
+    b.innerHTML = `<span class="dot" style="background:${p.color}"></span><span class="nm">${p.name}</span>`;
+    b.addEventListener('click', () => selectColor(i));
+    paletteEl.appendChild(b);
+    swatches.push(b);
+  });
+
+  const eraserBtn = document.getElementById('eraserBtn');
+
+  function selectColor(i){
+    currentColor = PALETTE[i].color;
+    tool = 'crayon';
+    swatches.forEach((s, j) => s.classList.toggle('sel', j === i));
+    eraserBtn.classList.remove('sel');
+  }
+  eraserBtn.addEventListener('click', () => {
+    tool = 'eraser';
+    swatches.forEach(s => s.classList.remove('sel'));
+    eraserBtn.classList.add('sel');
+  });
+
+  document.getElementById('backBtn').addEventListener('click', () => show('select'));
+  document.getElementById('touchBtn').addEventListener('click', () => show('select'));
+
+  /* --- 用紙を いつも 4:3 で いちばん大きく表示する --- */
+  const paperArea = paper.parentElement;
+  function fitPaper(){
+    if (!screens.paint.classList.contains('on')) return;
+    const s = Math.min(paperArea.clientWidth / 4, paperArea.clientHeight / 3);
+    paper.style.width  = Math.floor(s * 4) + 'px';
+    paper.style.height = Math.floor(s * 3) + 'px';
+  }
+  window.addEventListener('resize', fitPaper);
+  window.addEventListener('orientationchange', () => setTimeout(fitPaper, 250));
+
+  /* --- 絵をひらく --- */
+  function openPaint(index){
+    const art = ART[index];
+    ctx.clearRect(0, 0, W, H);
+    lineLayer.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(lineSvg(art.svg));
+    refImg.innerHTML = colorSvg(art.svg);
+    selectColor(0);
+    show('paint');
+    fitPaper();
+  }
+
+  /* =========================================================
+     クレヨン描画
+     ========================================================= */
+  function toCanvas(e){
+    const r = canvas.getBoundingClientRect();   // 枠線ぶんのズレを避けるため canvas 基準
+    return {
+      x: (e.clientX - r.left) * (W / r.width),
+      y: (e.clientY - r.top)  * (H / r.height)
+    };
+  }
+
+  // クレヨンらしい「かすれ」を出すため、半透明の点を重ねて描く
+  function stamp(x, y){
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = currentColor;
+
+    ctx.globalAlpha = 0.30;
+    ctx.beginPath(); ctx.arc(x, y, R * 0.92, 0, 6.2832); ctx.fill();
+
+    for (let i = 0; i < 6; i++){
+      const a = Math.random() * 6.2832;
+      const d = Math.random() * R * 0.95;
+      ctx.globalAlpha = 0.10 + Math.random() * 0.16;
+      ctx.beginPath();
+      ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, R * 0.34, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function erase(x0, y0, x1, y1){
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.globalAlpha = 1;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = ERASER_R * 2;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function drawLine(x0, y0, x1, y1){
+    if (tool === 'eraser'){ erase(x0, y0, x1, y1); return; }
+    const dist  = Math.hypot(x1 - x0, y1 - y0);
+    const step  = R * 0.34;
+    const n     = Math.max(1, Math.ceil(dist / step));
+    for (let i = 1; i <= n; i++){
+      const t = i / n;
+      stamp(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+    }
+  }
+
+  // 複数の指で同時に描けるようにポインタごとに位置を覚えておく
+  const active = new Map();
+
+  paper.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { paper.setPointerCapture(e.pointerId); } catch (_) {}
+    const p = toCanvas(e);
+    active.set(e.pointerId, p);
+    if (tool === 'eraser') erase(p.x, p.y, p.x, p.y);
+    else stamp(p.x, p.y);
+  });
+
+  paper.addEventListener('pointermove', e => {
+    const prev = active.get(e.pointerId);
+    if (!prev) return;
+    e.preventDefault();
+    // iPad の高頻度タッチをまとめて滑らかな線にする
+    const evts = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
+    let last = prev;
+    for (const ev of evts){
+      const p = toCanvas(ev);
+      drawLine(last.x, last.y, p.x, p.y);
+      last = p;
+    }
+    active.set(e.pointerId, last);
+  });
+
+  function endPointer(e){ active.delete(e.pointerId); }
+  paper.addEventListener('pointerup', endPointer);
+  paper.addEventListener('pointercancel', endPointer);
+  paper.addEventListener('pointerleave', endPointer);
+
+  /* --- ダブルタップ拡大や画面スクロールを止める --- */
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('touchmove', e => e.preventDefault(), { passive:false });
+  document.addEventListener('dblclick', e => e.preventDefault());
+
+})();
+</script>
+</body>
+</html>

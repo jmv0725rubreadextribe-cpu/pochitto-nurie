@@ -1,0 +1,13 @@
+{
+  "name": "ぽちっとぬりえ",
+  "short_name": "ぬりえ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#FFE9C2",
+  "theme_color": "#FFB020",
+  "icons": [
+    { "src": "icon.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
