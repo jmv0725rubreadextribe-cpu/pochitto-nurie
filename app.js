@@ -203,9 +203,9 @@
   }
 
   /* --- クレヨン --- */
-  function toCanvas(e){
+  function toCanvasXY(cx, cy){
     const r = canvas.getBoundingClientRect();
-    return { x:(e.clientX - r.left) * (W / r.width), y:(e.clientY - r.top) * (H / r.height) };
+    return { x:(cx - r.left) * (W / r.width), y:(cy - r.top) * (H / r.height) };
   }
 
   function stamp(x, y){
@@ -242,29 +242,100 @@
     }
   }
 
+  /* =========================================================
+     入力 ― ゆびでも Apple Pencil でも描けるようにする
+
+     ふつうは Pointer Events だけで足りるが、iPad の設定や
+     iPadOS の版によっては Apple Pencil の Pointer Events が
+     届かないことがある。そのため Touch Events でも同じ処理を
+     呼べるようにしてある（Apple Pencil は touchType が
+     "stylus" の Touch Event を必ず出す）。
+     二重に描かないよう、直前に Pointer が来ていたら Touch は無視する。
+     ========================================================= */
   const active = new Map();
-  paper.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    try { paper.setPointerCapture(e.pointerId); } catch (_) {}
-    const p = toCanvas(e);
-    active.set(e.pointerId, p);
+  let lastPointerAt = 0;
+
+  const diag = { pointer:{}, touch:{} };
+  function note(box, key){
+    diag[box][key || '?'] = (diag[box][key || '?'] || 0) + 1;
+  }
+
+  function begin(id, cx, cy){
+    const p = toCanvasXY(cx, cy);
+    active.set(id, p);
     if (tool === 'eraser') erase(p.x, p.y, p.x, p.y); else stamp(p.x, p.y);
-  });
-  paper.addEventListener('pointermove', e => {
-    const prev = active.get(e.pointerId);
+  }
+  function move(id, pts){
+    const prev = active.get(id);
     if (!prev) return;
-    e.preventDefault();
-    const evts = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
     let last = prev;
-    for (const ev of evts){
-      const p = toCanvas(ev);
+    for (const pt of pts){
+      const p = toCanvasXY(pt.x, pt.y);
       drawLine(last.x, last.y, p.x, p.y);
       last = p;
     }
-    active.set(e.pointerId, last);
+    active.set(id, last);
+  }
+  function end(id){ active.delete(id); }
+
+  /* --- Pointer Events（本線） --- */
+  paper.addEventListener('pointerdown', e => {
+    lastPointerAt = performance.now();
+    note('pointer', e.pointerType);
+    e.preventDefault();
+    try { paper.setPointerCapture(e.pointerId); } catch (_) {}
+    begin(e.pointerId, e.clientX, e.clientY);
   });
-  function endPointer(e){ active.delete(e.pointerId); }
-  ['pointerup','pointercancel','pointerleave'].forEach(t => paper.addEventListener(t, endPointer));
+  paper.addEventListener('pointermove', e => {
+    lastPointerAt = performance.now();
+    if (!active.has(e.pointerId)) return;
+    e.preventDefault();
+    const evts = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
+    move(e.pointerId, evts.map(v => ({ x:v.clientX, y:v.clientY })));
+  });
+  ['pointerup','pointercancel'].forEach(t => paper.addEventListener(t, e => {
+    lastPointerAt = performance.now();
+    end(e.pointerId);
+  }));
+
+  /* --- Touch Events（Pointer が届かない端末むけの予備） --- */
+  function pointerAlive(){ return performance.now() - lastPointerAt < 500; }
+
+  paper.addEventListener('touchstart', e => {
+    note('touch', (e.changedTouches[0] || {}).touchType);
+    if (pointerAlive()) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) begin('t' + t.identifier, t.clientX, t.clientY);
+  }, { passive:false });
+
+  paper.addEventListener('touchmove', e => {
+    if (pointerAlive()) return;
+    e.preventDefault();
+    for (const t of e.changedTouches) move('t' + t.identifier, [{ x:t.clientX, y:t.clientY }]);
+  }, { passive:false });
+
+  ['touchend','touchcancel'].forEach(n => paper.addEventListener(n, e => {
+    for (const t of e.changedTouches) end('t' + t.identifier);
+  }, { passive:false }));
+
+  /* --- しらべる画面（みほんを1秒 長おし） --- */
+  const diagModal = document.getElementById('diagModal');
+  const diagText  = document.getElementById('diagText');
+  const refBox    = document.querySelector('.ref');
+  let diagTimer = null;
+  refBox.addEventListener('pointerdown', () => {
+    diagTimer = setTimeout(() => {
+      const fmt = o => Object.keys(o).length ? Object.keys(o).map(k => k + ' × ' + o[k]).join('  /  ') : 'まだ来ていません';
+      diagText.innerHTML =
+        'Pointer Events<br>' + fmt(diag.pointer) +
+        '<br><br>Touch Events<br>' + fmt(diag.touch) +
+        '<br><br>maxTouchPoints: ' + navigator.maxTouchPoints;
+      diagModal.classList.add('on');
+    }, 1000);
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(t =>
+    refBox.addEventListener(t, () => clearTimeout(diagTimer)));
+  document.getElementById('diagClose').addEventListener('click', () => diagModal.classList.remove('on'));
 
   /* =========================================================
      ぜんぶけす

@@ -1,10 +1,10 @@
 /* ぽちっとぬりえ ― オフラインで動かすための Service Worker
    一度ひらけば、以後は電波が無くてもホーム画面から起動できます。
 
-   ※ ファイルを更新したときは CACHE の数字（v2 → v3 …）を上げてください。
+   ※ ファイルを更新したときは CACHE の数字（v3 → v4 …）を上げてください。
       そうしないと iPad が古い版を使いつづけます。                        */
 
-const CACHE = 'pochi-nurie-v2';
+const CACHE = 'pochi-nurie-v3';
 
 const ASSETS = [
   './',
