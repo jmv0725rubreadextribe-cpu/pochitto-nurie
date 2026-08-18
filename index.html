@@ -134,7 +134,6 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 }
 .page-btn:active{ transform:translateY(6px); box-shadow:0 1px 0 rgba(58,46,34,.4); }
 .page-btn .ar{ font-size: clamp(30px,5vh,52px); line-height:1; }
-.page-btn .ic{ font-size: clamp(22px,3.6vh,38px); line-height:1.1; }
 .grid{
   flex:1 1 auto; display:grid;
   grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(3,1fr);
@@ -200,8 +199,22 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
   transition:transform .08s;
 }
 .btn:active{ transform:translateY(6px); box-shadow:0 1px 0 rgba(58,46,34,.4); }
-.btn .ic{ font-size: clamp(19px,3.4vh,36px); line-height:1; }
-.btn .tx{ font-size: clamp(14px,2.5vh,27px); }
+.btn .tx{ font-size: clamp(16px,2.9vh,31px); }
+
+/* クレヨンのふとさ */
+.sizes{ flex:0 0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(3px,.6vh,8px); }
+.size{
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  background:#FFFFFF; border:5px solid #3A2E22; border-radius:16px;
+  padding:clamp(4px,.8vh,9px) 2px clamp(5px,.9vh,10px);
+  box-shadow:0 5px 0 rgba(58,46,34,.35); transition:transform .08s;
+}
+.size:active{ transform:translateY(4px); box-shadow:0 1px 0 rgba(58,46,34,.35); }
+.size .d{ border-radius:50%; background:#3A2E22; }
+.size .t{ font-size: clamp(10px,1.8vh,19px); line-height:1; }
+.size.sel{ background:#3A2E22; }
+.size.sel .t{ color:#FFF3D6; }
+.size.sel .d{ background:#FFF3D6; }
 #backBtn  { background:linear-gradient(180deg,#B7E7FF,#6FC6F5); }
 #clearBtn { background:linear-gradient(180deg,#FFC9C4,#FF8F86); }
 #saveBtn  { background:linear-gradient(180deg,#CFF3C9,#8DD48A); }
@@ -260,7 +273,7 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 
 <section id="titleScreen" class="screen on">
   <div class="title-wrap"><h1 class="app-title" id="appTitle"></h1></div>
-  <button class="touch-btn" id="touchBtn"><span class="finger">👆</span>タッチ</button>
+  <button class="touch-btn" id="touchBtn">タッチ</button>
 
   <button id="sndBtn" class="mini" aria-label="おと">🔊</button>
   <button id="bgBtn"  class="mini" aria-label="はいけい">⚙</button>
@@ -276,9 +289,9 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 <section id="selectScreen" class="screen">
   <div class="select-head" id="pageTitle">のりもの</div>
   <div class="select-body">
-    <button class="page-btn" id="prevBtn"><span class="ar">◀</span><span class="ic" id="prevIc">🐰</span></button>
+    <button class="page-btn" id="prevBtn"><span class="ar">◀</span></button>
     <div class="grid" id="grid"></div>
-    <button class="page-btn" id="nextBtn"><span class="ar">▶</span><span class="ic" id="nextIc">🌷</span></button>
+    <button class="page-btn" id="nextBtn"><span class="ar">▶</span></button>
   </div>
 </section>
 
@@ -293,12 +306,13 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
     <div class="palette" id="palette"></div>
   </div>
   <div class="side">
-    <button class="btn" id="backBtn"><span class="ic">👈</span><span class="tx">もどる</span></button>
+    <button class="btn" id="backBtn"><span class="tx">もどる</span></button>
     <div class="ref"><div class="cap">みほん</div><div id="refImg"></div></div>
+    <div class="sizes" id="sizes"></div>
     <div class="spacer"></div>
-    <button class="btn" id="saveBtn"><span class="ic">📷</span><span class="tx">ほぞん</span></button>
-    <button class="btn" id="clearBtn"><span class="ic">🧹</span><span class="tx">ぜんぶけす</span></button>
-    <button class="btn" id="eraserBtn"><span class="ic">🧽</span><span class="tx">けしごむ</span></button>
+    <button class="btn" id="saveBtn"><span class="tx">ほぞん</span></button>
+    <button class="btn" id="clearBtn"><span class="tx">ぜんぶけす</span></button>
+    <button class="btn" id="eraserBtn"><span class="tx">けしごむ</span></button>
   </div>
 </section>
 

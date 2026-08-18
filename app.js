@@ -142,15 +142,11 @@
   const pageTitle = document.getElementById('pageTitle');
   const prevBtn   = document.getElementById('prevBtn');
   const nextBtn   = document.getElementById('nextBtn');
-  const prevIc    = document.getElementById('prevIc');
-  const nextIc    = document.getElementById('nextIc');
   let page = START_PAGE;
 
   function drawPage(){
     const p = PAGES[page];
     pageTitle.textContent = p.name;
-    prevIc.textContent = PAGES[(page - 1 + PAGES.length) % PAGES.length].icon;
-    nextIc.textContent = PAGES[(page + 1) % PAGES.length].icon;
     grid.innerHTML = '';
     p.art.forEach(art => {
       const card = document.createElement('button');
@@ -177,8 +173,16 @@
   const paperArea = paper.parentElement;
 
   const W = canvas.width, H = canvas.height;
-  const R = 12;              // クレヨンの太さ（細め）。太くしたいときはここ
-  const ERASER_R = R * 3;
+
+  /* クレヨンのふとさ 3だん（まん中が これまでの太さ） */
+  const SIZES = [
+    { name:'ほそい', r:  8, dot:  8 },
+    { name:'ふつう', r: 12, dot: 13 },
+    { name:'ふとい', r: 20, dot: 21 }
+  ];
+  let sizeIndex = 1;
+  let R = SIZES[sizeIndex].r;
+  let ERASER_R = R * 3;
 
   let currentColor = PALETTE[0].color;
   let tool = 'crayon';
@@ -195,10 +199,32 @@
     swatches.push(b);
   });
 
+  /* --- クレヨンのふとさ 3だん --- */
+  const sizesEl = document.getElementById('sizes');
+  const sizeBtns = [];
+  SIZES.forEach((sz, i) => {
+    const b = document.createElement('button');
+    b.className = 'size' + (i === sizeIndex ? ' sel' : '');
+    b.innerHTML = `<span class="d" style="width:${sz.dot}px;height:${sz.dot}px"></span>` +
+                  `<span class="t">${sz.name}</span>`;
+    onTap(b, () => selectSize(i));
+    sizesEl.appendChild(b);
+    sizeBtns.push(b);
+  });
+  function selectSize(i){
+    sizeIndex = i;
+    R = SIZES[i].r;
+    ERASER_R = R * 3;
+    tipMasks = [];        // ふとさが変わったので 先の画像を作り直す
+    buildTips();
+    sizeBtns.forEach((b, j) => b.classList.toggle('sel', j === i));
+  }
+
   const eraserBtn = document.getElementById('eraserBtn');
   function selectColor(i){
     currentColor = PALETTE[i].color;
     tool = 'crayon';
+    buildTips();
     swatches.forEach((s, j) => s.classList.toggle('sel', j === i));
     eraserBtn.classList.remove('sel');
   }
@@ -237,18 +263,97 @@
     return { x:(cx - r.left) * (W / r.width), y:(cy - r.top) * (H / r.height) };
   }
 
-  function stamp(x, y){
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = currentColor;
-    ctx.globalAlpha = 0.30;
-    ctx.beginPath(); ctx.arc(x, y, R * 0.92, 0, 6.2832); ctx.fill();
-    for (let i = 0; i < 6; i++){
-      const a = Math.random() * 6.2832, d = Math.random() * R * 0.95;
-      ctx.globalAlpha = 0.10 + Math.random() * 0.16;
-      ctx.beginPath();
-      ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, R * 0.34, 0, 6.2832);
-      ctx.fill();
+  /* -------------------------------------------------------------
+     クレヨンの質感
+
+     まる を描くのではなく、あらかじめ「クレヨンの先」の画像を
+     8種類つくっておき、それをランダムに選んで押していく。
+     先の画像は、中心が濃くふちがかすれた円から、こまかい穴を
+     たくさんあけたもの。紙の目にワックスが乗りきらない感じが出る。
+     一度なぞると かすれ、何度も重ねると だんだん濃くなる。
+     ------------------------------------------------------------- */
+  const TIP_VARIANTS = 8;
+  let tipMasks = [];   // 白黒のかたち（ふとさが変わったら作り直す）
+  let tips = [];       // 色をつけたもの（色が変わったら作り直す）
+
+  function buildTipMasks(){
+    tipMasks = [];
+    const size = R * 2 + 6;
+    for (let v = 0; v < TIP_VARIANTS; v++){
+      const c = document.createElement('canvas');
+      c.width = c.height = size;
+      const g = c.getContext('2d');
+      const m = size / 2;
+
+      // 芯のかたち（まん中が濃く、ふちに向かってかすれる）
+      const grad = g.createRadialGradient(m, m, R * 0.1, m, m, R);
+      grad.addColorStop(0,    'rgba(0,0,0,1)');
+      grad.addColorStop(0.70, 'rgba(0,0,0,0.97)');
+      grad.addColorStop(0.92, 'rgba(0,0,0,0.72)');
+      grad.addColorStop(1,    'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.beginPath(); g.arc(m, m, R, 0, 6.2832); g.fill();
+
+      // ふちを でこぼこにする
+      g.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 10; i++){
+        const a = Math.random() * 6.2832;
+        const d = R * (0.75 + Math.random() * 0.45);
+        g.globalAlpha = 0.35 + Math.random() * 0.5;
+        g.beginPath();
+        g.arc(m + Math.cos(a) * d, m + Math.sin(a) * d, R * (0.16 + Math.random() * 0.22), 0, 6.2832);
+        g.fill();
+      }
+      // 紙の目（こまかい穴）
+      // 目の大きさは紙のものなので、クレヨンが太くなっても変えない。
+      // 数だけ面積に合わせて増やす（そうしないと太い方だけ薄くなる）。
+      const holes = Math.round(Math.PI * R * R * 0.34);
+      for (let i = 0; i < holes; i++){
+        const a = Math.random() * 6.2832;
+        const d = Math.sqrt(Math.random()) * R;
+        g.globalAlpha = 0.25 + Math.random() * 0.65;
+        g.beginPath();
+        g.arc(m + Math.cos(a) * d, m + Math.sin(a) * d, 0.45 + Math.random() * 1.25, 0, 6.2832);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+      g.globalCompositeOperation = 'source-over';
+      tipMasks.push(c);
     }
+  }
+
+  function shade(hex, amt){
+    const n = parseInt(hex.slice(1), 16);
+    const cl = v => Math.max(0, Math.min(255, v));
+    return 'rgb(' + cl(((n >> 16) & 255) + amt) + ',' +
+                    cl(((n >> 8) & 255) + amt) + ',' +
+                    cl((n & 255) + amt) + ')';
+  }
+
+  function buildTips(){
+    if (!tipMasks.length) buildTipMasks();
+    tips = tipMasks.map((mask, i) => {
+      const c = document.createElement('canvas');
+      c.width = mask.width; c.height = mask.height;
+      const g = c.getContext('2d');
+      g.drawImage(mask, 0, 0);
+      g.globalCompositeOperation = 'source-in';
+      g.fillStyle = shade(currentColor, -9 + i * 3);   // 少しずつ濃さを変える
+      g.fillRect(0, 0, c.width, c.height);
+      return c;
+    });
+  }
+
+  let penPressure = 0;                                  // Apple Pencil のときだけ入る
+  function strokeAlpha(){
+    return penPressure > 0 ? 0.24 + penPressure * 0.46 : 0.48;
+  }
+
+  function stamp(x, y){
+    const t = tips[(Math.random() * tips.length) | 0];
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = strokeAlpha();
+    ctx.drawImage(t, x - t.width / 2, y - t.height / 2);
     ctx.globalAlpha = 1;
   }
 
@@ -264,7 +369,7 @@
   function drawLine(x0, y0, x1, y1){
     if (tool === 'eraser'){ erase(x0, y0, x1, y1); return; }
     const dist = Math.hypot(x1 - x0, y1 - y0);
-    const n = Math.max(1, Math.ceil(dist / (R * 0.34)));
+    const n = Math.max(1, Math.ceil(dist / (R * 0.28)));
     for (let i = 1; i <= n; i++){
       const t = i / n;
       stamp(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
@@ -309,9 +414,14 @@
   function end(id){ active.delete(id); }
 
   /* --- Pointer Events（本線） --- */
+  function readPressure(e){
+    penPressure = (e.pointerType === 'pen' && e.pressure > 0) ? e.pressure : 0;
+  }
+
   paper.addEventListener('pointerdown', e => {
     lastPointerAt = performance.now();
     note('pointer', e.pointerType);
+    readPressure(e);
     e.preventDefault();
     try { paper.setPointerCapture(e.pointerId); } catch (_) {}
     begin(e.pointerId, e.clientX, e.clientY);
@@ -319,6 +429,7 @@
   paper.addEventListener('pointermove', e => {
     lastPointerAt = performance.now();
     if (!active.has(e.pointerId)) return;
+    readPressure(e);
     e.preventDefault();
     const evts = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
     move(e.pointerId, evts.map(v => ({ x:v.clientX, y:v.clientY })));
