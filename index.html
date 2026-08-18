@@ -86,14 +86,26 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 
 /* こっそりボタン（背景・音） */
 .mini{
-  position:absolute; top:8px; z-index:5;
-  width:54px; height:54px; border-radius:50%;
-  font-size:25px; line-height:54px;
+  position:absolute; z-index:5;
+  /* ホーム画面から起動すると画面の上端がステータスバーの下に潜るので、
+     その分だけ下げる（ふつうに開いたときは 0 になる）              */
+  top: calc(env(safe-area-inset-top) + 10px);
+  width:64px; height:64px; border-radius:50%;
+  font-size:28px; line-height:60px;
   background:rgba(0,0,0,.34); color:#fff; opacity:.55;
   border:2px solid rgba(255,255,255,.5);
 }
-#bgBtn{ right:10px; }
-#sndBtn{ left:10px; opacity:.85; }
+#bgBtn{ right: calc(env(safe-area-inset-right) + 12px); }
+#sndBtn{ left: calc(env(safe-area-inset-left) + 12px); opacity:.85; }
+
+/* 長おし中だとわかるように、押している間ふくらむ */
+#bgBtn.holding{
+  animation: holding .6s linear forwards;
+}
+@keyframes holding{
+  from{ background:rgba(0,0,0,.34); transform:scale(1);    opacity:.55 }
+  to  { background:rgba(255,255,255,.92); color:#23201C; transform:scale(1.45); opacity:1 }
+}
 
 #bgPanel{
   position:absolute; inset:0; z-index:6; display:none;
