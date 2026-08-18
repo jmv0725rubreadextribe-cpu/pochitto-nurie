@@ -6,6 +6,35 @@
   document.getElementById('appTitle').innerHTML =
     [...'ぽちっとぬりえ'].map(c => `<span class="c">${c}</span>`).join('');
 
+  /* =========================================================
+     タップの受け取り方
+
+     iOS は touchmove を preventDefault() すると click を合成しない。
+     Apple Pencil は先が細く、タップしただけでも微小な移動を報告するので
+     毎回 touchmove が出て click が消えてしまう（指は出ないことが多い）。
+     そのため click に頼らず、pointerdown → pointerup で拾う。
+     指・Apple Pencil・マウスのどれでも同じように動く。
+     ========================================================= */
+  function diagTap(){ if (window.__diag) window.__diag.tap++; }
+  function onTap(el, fn){
+    if (!window.PointerEvent){ el.addEventListener('click', fn); return; }
+    let id = null, sx = 0, sy = 0, moved = false;
+    el.addEventListener('pointerdown', e => {
+      id = e.pointerId; sx = e.clientX; sy = e.clientY; moved = false;
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    el.addEventListener('pointermove', e => {
+      if (e.pointerId !== id) return;
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) > 30) moved = true;  // 大きくずらしたら取り消し（小さい子の手ブレは許す）
+    });
+    el.addEventListener('pointerup', e => {
+      if (e.pointerId !== id) return;
+      id = null;
+      if (!moved){ diagTap(); fn(e); }
+    });
+    el.addEventListener('pointercancel', () => { id = null; });
+  }
+
   /* ---------- 画面切り替え ---------- */
   const screens = {
     title:  document.getElementById('titleScreen'),
@@ -35,7 +64,7 @@
   }
   paintSndBtn();
 
-  sndBtn.addEventListener('click', e => {
+  onTap(sndBtn, e => {
     e.stopPropagation();
     soundOn = !soundOn;
     localStorage.setItem(SND_KEY, soundOn ? 'on' : 'off');
@@ -69,9 +98,9 @@
   ['pointerup','pointerleave','pointercancel'].forEach(t =>
     bgBtn.addEventListener(t, () => clearTimeout(bgTimer)));
 
-  document.getElementById('bgClose').addEventListener('click', () => bgPanel.classList.remove('on'));
-  document.getElementById('bgPick').addEventListener('click', () => bgFile.click());
-  document.getElementById('bgReset').addEventListener('click', () => {
+  onTap(document.getElementById('bgClose'), () => bgPanel.classList.remove('on'));
+  onTap(document.getElementById('bgPick'), () => bgFile.click());
+  onTap(document.getElementById('bgReset'), () => {
     localStorage.removeItem(BG_KEY);
     titleScreen.style.backgroundImage = '';
     bgPanel.classList.remove('on');
@@ -127,15 +156,15 @@
       const card = document.createElement('button');
       card.className = 'card';
       card.innerHTML = colorSvg(art.svg) + `<div class="label">${art.name}</div>`;
-      card.addEventListener('click', () => openPaint(art));
+      onTap(card, () => openPaint(art));
       grid.appendChild(card);
     });
   }
-  prevBtn.addEventListener('click', () => { page = (page - 1 + PAGES.length) % PAGES.length; drawPage(); });
-  nextBtn.addEventListener('click', () => { page = (page + 1) % PAGES.length; drawPage(); });
+  onTap(prevBtn, () => { page = (page - 1 + PAGES.length) % PAGES.length; drawPage(); });
+  onTap(nextBtn, () => { page = (page + 1) % PAGES.length; drawPage(); });
   drawPage();
 
-  document.getElementById('touchBtn').addEventListener('click', () => { playBgm(); show('select'); });
+  onTap(document.getElementById('touchBtn'), () => { playBgm(); show('select'); });
 
   /* =========================================================
      ぬりえ画面
@@ -161,7 +190,7 @@
     const b = document.createElement('button');
     b.className = 'swatch' + (i === 0 ? ' sel' : '');
     b.innerHTML = `<span class="dot" style="background:${p.color}"></span><span class="nm">${p.name}</span>`;
-    b.addEventListener('click', () => selectColor(i));
+    onTap(b, () => selectColor(i));
     paletteEl.appendChild(b);
     swatches.push(b);
   });
@@ -173,13 +202,13 @@
     swatches.forEach((s, j) => s.classList.toggle('sel', j === i));
     eraserBtn.classList.remove('sel');
   }
-  eraserBtn.addEventListener('click', () => {
+  onTap(eraserBtn, () => {
     tool = 'eraser';
     swatches.forEach(s => s.classList.remove('sel'));
     eraserBtn.classList.add('sel');
   });
 
-  document.getElementById('backBtn').addEventListener('click', () => show('select'));
+  onTap(document.getElementById('backBtn'), () => show('select'));
 
   /* --- 用紙を いつも 4:3 で いちばん大きく --- */
   function fitPaper(){
@@ -255,7 +284,8 @@
   const active = new Map();
   let lastPointerAt = 0;
 
-  const diag = { pointer:{}, touch:{} };
+  const diag = { pointer:{}, touch:{}, tap:0 };
+  window.__diag = diag;
   function note(box, key){
     diag[box][key || '?'] = (diag[box][key || '?'] || 0) + 1;
   }
@@ -329,21 +359,22 @@
       diagText.innerHTML =
         'Pointer Events<br>' + fmt(diag.pointer) +
         '<br><br>Touch Events<br>' + fmt(diag.touch) +
-        '<br><br>maxTouchPoints: ' + navigator.maxTouchPoints;
+        '<br><br>ボタンが反応した回数: ' + diag.tap +
+        '<br>maxTouchPoints: ' + navigator.maxTouchPoints;
       diagModal.classList.add('on');
     }, 1000);
   });
   ['pointerup','pointerleave','pointercancel'].forEach(t =>
     refBox.addEventListener(t, () => clearTimeout(diagTimer)));
-  document.getElementById('diagClose').addEventListener('click', () => diagModal.classList.remove('on'));
+  onTap(document.getElementById('diagClose'), () => diagModal.classList.remove('on'));
 
   /* =========================================================
      ぜんぶけす
      ========================================================= */
   const clearModal = document.getElementById('clearModal');
-  document.getElementById('clearBtn').addEventListener('click', () => clearModal.classList.add('on'));
-  document.getElementById('clearNo').addEventListener('click', () => clearModal.classList.remove('on'));
-  document.getElementById('clearYes').addEventListener('click', () => {
+  onTap(document.getElementById('clearBtn'), () => clearModal.classList.add('on'));
+  onTap(document.getElementById('clearNo'), () => clearModal.classList.remove('on'));
+  onTap(document.getElementById('clearYes'), () => {
     ctx.clearRect(0, 0, W, H);
     clearModal.classList.remove('on');
   });
@@ -355,7 +386,7 @@
   const saveImg   = document.getElementById('saveImg');
   const saveMsg   = document.getElementById('saveMsg');
 
-  document.getElementById('saveBtn').addEventListener('click', () => {
+  onTap(document.getElementById('saveBtn'), () => {
     const ex = document.createElement('canvas');
     ex.width = W; ex.height = H;
     const g = ex.getContext('2d');
@@ -377,16 +408,18 @@
     saveMsg.innerHTML = 'えを ながおしして<br>「"写真"に追加」を えらんでね';
     saveModal.classList.add('on');
   });
-  document.getElementById('saveClose').addEventListener('click', () => {
+  onTap(document.getElementById('saveClose'), () => {
     saveModal.classList.remove('on');
     saveImg.removeAttribute('src');
   });
 
   /* ---------- 画面のズーム・スクロールを止める ---------- */
   document.addEventListener('gesturestart', e => e.preventDefault());
+  // ぬりえの紙の上だけスクロールを止める。
+  // ページ全体で止めると iOS が click を合成しなくなり、
+  // Apple Pencil でボタンが押せなくなる。
   document.addEventListener('touchmove', e => {
-    if (e.target && e.target.id === 'saveImg') return;   // 保存した絵は長おしできるように
-    e.preventDefault();
+    if (e.target && e.target.closest && e.target.closest('.paper')) e.preventDefault();
   }, { passive:false });
   document.addEventListener('dblclick', e => e.preventDefault());
 
