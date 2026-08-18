@@ -91,25 +91,11 @@
   const bgBtn   = document.getElementById('bgBtn');
   const bgPanel = document.getElementById('bgPanel');
   const bgFile  = document.getElementById('bgFile');
-  /* 長おしで開く（小さい子が誤って触らないように）。
-     指が少しずれても切れないよう、押している間ポインタを掴んでおく。
-     pointerleave では取り消さない ― Apple Pencil はホバーで
-     leave が飛ぶことがあり、それで毎回キャンセルされてしまう。      */
-  let bgTimer = null;
-  function endHold(){
-    clearTimeout(bgTimer);
-    bgBtn.classList.remove('holding');
-  }
-  bgBtn.addEventListener('pointerdown', e => {
-    e.preventDefault();
-    try { bgBtn.setPointerCapture(e.pointerId); } catch (_) {}
-    bgBtn.classList.add('holding');
-    bgTimer = setTimeout(() => {
-      bgBtn.classList.remove('holding');
-      bgPanel.classList.add('on');
-    }, 600);
+  /* ふつうのタッチで開く */
+  onTap(bgBtn, e => {
+    e.stopPropagation();
+    bgPanel.classList.add('on');
   });
-  ['pointerup','pointercancel'].forEach(t => bgBtn.addEventListener(t, endHold));
 
   onTap(document.getElementById('bgClose'), () => bgPanel.classList.remove('on'));
   onTap(document.getElementById('bgPick'), () => bgFile.click());

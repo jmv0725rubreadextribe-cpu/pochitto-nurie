@@ -98,14 +98,8 @@ button{ font-family:inherit; border:none; background:none; cursor:pointer; color
 #bgBtn{ right: calc(env(safe-area-inset-right) + 12px); }
 #sndBtn{ left: calc(env(safe-area-inset-left) + 12px); opacity:.85; }
 
-/* 長おし中だとわかるように、押している間ふくらむ */
-#bgBtn.holding{
-  animation: holding .6s linear forwards;
-}
-@keyframes holding{
-  from{ background:rgba(0,0,0,.34); transform:scale(1);    opacity:.55 }
-  to  { background:rgba(255,255,255,.92); color:#23201C; transform:scale(1.45); opacity:1 }
-}
+/* 押したのがわかるように */
+.mini:active{ background:rgba(255,255,255,.92); color:#23201C; transform:scale(1.12); opacity:1; }
 
 #bgPanel{
   position:absolute; inset:0; z-index:6; display:none;
